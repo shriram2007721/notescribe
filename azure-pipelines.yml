@@ -5,7 +5,8 @@
 #            install -> lint -> type-check -> build -> verify -> publish artifact
 #   Stage 2  CD  (Continuous Delivery)
 #            [manual approval on the "notescribe-production" environment]
-#            download artifact -> deploy to Azure Static Web Apps (Free tier)
+#            download artifact -> package versioned release zip + checksum -> publish
+#            (No Azure subscription needed. Runs entirely in free Azure DevOps.)
 #
 # Governance (configured in the portal, see GOVERNANCE.md):
 #   - main is protected by a branch policy: PR + 1 reviewer + this pipeline must pass.
@@ -29,7 +30,6 @@ pool:
   vmImage: ubuntu-latest
 
 variables:
-  - group: notescribe-secrets # holds the secret SWA_DEPLOYMENT_TOKEN
   - name: NODE_VERSION
     value: "20.x"
   - name: npm_config_cache
@@ -90,14 +90,14 @@ stages:
 
   # -------------------------------------------------------------------
   - stage: CD
-    displayName: "Continuous Delivery (Deploy to Azure)"
+    displayName: "Continuous Delivery (Approved Release)"
     dependsOn: CI
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
-      # A "deployment" job targets an Environment; approvals and checks on that
-      # environment pause the run here until someone clicks Approve.
-      - deployment: DeployWeb
-        displayName: Deploy to Azure Static Web Apps
+      # A "deployment" job targets an Environment; the approval check on that
+      # environment pauses the run here until someone clicks Approve.
+      - deployment: Release
+        displayName: Package approved release
         environment: notescribe-production
         strategy:
           runOnce:
@@ -107,11 +107,20 @@ stages:
                   artifact: site
                   displayName: Download build artifact
 
-                - task: AzureStaticWebApp@0
-                  displayName: Upload site to Static Web Apps
+                - task: ArchiveFiles@2
+                  displayName: Package site as zip
                   inputs:
-                    app_location: /
-                    cwd: $(Pipeline.Workspace)/site
-                    skip_app_build: true
-                    skip_api_build: true
-                    azure_static_web_apps_api_token: $(SWA_DEPLOYMENT_TOKEN)
+                    rootFolderOrFile: $(Pipeline.Workspace)/site
+                    includeRootFolder: false
+                    archiveType: zip
+                    archiveFile: $(Pipeline.Workspace)/release/notescribe-$(Build.BuildNumber).zip
+
+                - script: |
+                    cd "$(Pipeline.Workspace)/release"
+                    sha256sum *.zip > SHA256SUMS.txt
+                    cat SHA256SUMS.txt
+                  displayName: Generate checksum
+
+                - publish: $(Pipeline.Workspace)/release
+                  artifact: release
+                  displayName: Publish approved release package

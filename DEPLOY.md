@@ -1,50 +1,52 @@
-# Deploying NoteScribe (free tier only)
+# Running the NoteScribe CI/CD pipeline (free, no credit card)
 
-Everything here costs $0:
+Everything runs inside **Azure DevOps** (dev.azure.com), which is free for up to 5 users.
+**No Azure subscription and no payment details are needed.**
 
-| Piece | Service | Free allowance |
-|---|---|---|
-| Source control | Azure Repos | Free for up to 5 users |
-| CI/CD | Azure Pipelines (`azure-pipelines.yml`) | 1 Microsoft-hosted parallel job, 1,800 min/month |
-| Hosting | Azure Static Web Apps, **Free** plan (`infra/main.bicep`) | 100 GB bandwidth/month, custom domains, free SSL |
+| Stage | What it does |
+|---|---|
+| **CI** | Install → ESLint → TypeScript check → build → verify output → save artifact |
+| **CD** | Waits for **Approve** → packages a versioned release `.zip` + checksum → publishes it |
 
-The app is fully client-side (IndexedDB, in-browser Whisper), so it needs no backend, database or paid AI service.
+## 1. Create the project
+1. Go to **https://dev.azure.com** and sign in with a **personal** Microsoft account (a college account may be blocked).
+2. Create an organization if asked, then **+ New project** → `NoteScribe` → **Private** → **Create**.
 
-## 1. Create the Azure DevOps project
-1. Go to https://dev.azure.com and create an organization and project (e.g. `NoteScribe`).
-2. **Repos**: push this folder to the project's repository:
+## 2. Push the code (Azure Repos)
+1. In the project, go to **Repos → Files**. Copy the HTTPS clone URL.
+2. Click **Generate Git Credentials** and copy the password it shows.
+3. In a terminal, from the `notescribe` folder:
    ```bash
-   git remote add origin https://dev.azure.com/<org>/NoteScribe/_git/NoteScribe
+   git remote add origin <the clone URL>
    git push -u origin main
    ```
+   When asked, paste the password from step 2.
 
-> **New organizations start with no free hosted pipeline minutes.** Request them (free) at
-> https://aka.ms/azpipelines-parallelism-request. Approval usually takes 2–3 business days.
-> Until then you can register your own PC as a free self-hosted agent
-> (Project settings → Agent pools → Default → New agent) and set `pool: name: Default` in the YAML.
+## 3. Give the pipeline a machine to run on
+New organizations have no free cloud build time until Microsoft approves it. Pick **one** option:
 
-## 2. Create the Static Web App (free)
-With the Azure CLI (`az login` first):
-```bash
-az group create -n rg-notescribe -l eastus2
-az deployment group create -g rg-notescribe -f infra/main.bicep
-```
-Or, in the Azure Portal: Create resource → Static Web App → Plan type **Free** → Deployment source **Other**.
+- **Option A: request free cloud build time.** Fill in https://aka.ms/azpipelines-parallelism-request (no card needed). It takes 2–3 business days.
+- **Option B: use your own PC now (free, no waiting).**
+  1. **Project settings → Agent pools → Default → New agent → Windows** → follow the download and `config.cmd` steps.
+     Create the Personal Access Token it asks for via **User settings → Personal access tokens** (scope: *Agent Pools: Read & manage*).
+  2. Start the agent with `run.cmd`.
+  3. In `azure-pipelines.yml`, replace
+     ```yaml
+     pool:
+       vmImage: ubuntu-latest
+     ```
+     with
+     ```yaml
+     pool:
+       name: Default
+     ```
+     Your PC needs Node.js 20+ and Git installed.
 
-Then copy the deployment token:
-```bash
-az staticwebapp secrets list -n <staticWebAppName from the output> --query properties.apiKey -o tsv
-```
-(Portal: Static Web App → Overview → *Manage deployment token*.)
+## 4. Create the pipeline
+1. **Pipelines → New pipeline → Azure Repos Git → NoteScribe → Existing Azure Pipelines YAML file → `/azure-pipelines.yml`** → **Run**.
+2. CI runs. The CD stage then waits on the `notescribe-production` environment.
+3. Set up the approval gate and the branch policy using **GOVERNANCE.md**.
 
-## 3. Wire up the pipeline
-1. **Pipelines → Library → + Variable group** named `notescribe-secrets`.
-   Add variable `SWA_DEPLOYMENT_TOKEN` = the token, and click the lock icon to make it secret.
-2. **Pipelines → New pipeline → Azure Repos Git → NoteScribe → Existing YAML file → `/azure-pipelines.yml`** → Run.
-3. On the first run, approve access to the variable group and the `notescribe-production` environment when prompted.
-
-From then on:
-- **Pull requests to `main`**: lint, type-check and build.
-- **Pushes to `main`**: the same checks, then deploy to `https://<name>.azurestaticapps.net`.
-
-Optional: add an approval check to the `notescribe-production` environment (Pipelines → Environments) so each deploy waits for a click.
+## 5. Get the release
+Open a finished run → **1 published** / **Artifacts** → download `release` → `notescribe-<build>.zip`.
+Unzip it and serve the folder with any static server (e.g. `npx serve`) to run the app.

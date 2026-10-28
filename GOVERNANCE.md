@@ -1,6 +1,6 @@
 # NoteScribe: DevOps governance ("process over product")
 
-These controls ensure that **no code reaches `main`, and no build reaches production, without a human decision.**
+These controls ensure that **no code reaches `main`, and no build is released, without a human decision.**
 
 ```
  feature branch ──PR──► [Branch policy: 1 reviewer + CI must pass] ──merge──► main
@@ -9,10 +9,10 @@ These controls ensure that **no code reaches `main`, and no build reaches produc
                                                                             │
                                   [Environment approval: "Approve" button]  ◄── quality gate
                                                                             │
-                                         CD stage (deploy to Azure Static Web Apps)
+                                         CD stage (package + publish approved release)
 ```
 
-Prerequisites: the repo is pushed to Azure Repos, and the pipeline has been created from `azure-pipelines.yml` and run once (see `DEPLOY.md`).
+Prerequisites: the repo is pushed to Azure Repos, and the pipeline has been created from `azure-pipelines.yml` and run once (see `DEPLOY.md`). No Azure subscription is needed.
 
 ---
 
@@ -46,7 +46,7 @@ Prerequisites: the repo is pushed to Azure Repos, and the pipeline has been crea
 
 ## Part 2: Quality gate with an environment approval
 
-The pipeline's CD stage targets the environment `notescribe-production`. An approval check on that environment pauses the run before deploying.
+The pipeline's CD stage targets the environment `notescribe-production`. An approval check on that environment pauses the run before the release is produced.
 
 1. Go to **Pipelines → Environments**.
    - If `notescribe-production` already exists (it's created automatically on the first run), open it.
@@ -60,13 +60,13 @@ The pipeline's CD stage targets the environment `notescribe-production`. An appr
      - **Allow approvers to approve their own runs**: checked if you are the only approver.
    - **Timeout**: e.g. `1 day`. The run is rejected automatically if nobody approves in time.
    - Click **Create**.
-4. *(Optional, stronger governance)* **+ → Business hours**, so deploys happen only within set hours. You can also add **+ → Branch control** → Allowed branches `refs/heads/main`, so only `main` can ever deploy to production.
+4. *(Optional, stronger governance)* **+ → Business hours**, so releases happen only within set hours. You can also add **+ → Branch control** → Allowed branches `refs/heads/main`, so only `main` can ever be released.
 
 **Result:** after CI succeeds, the run shows **"Waiting: 1 check needs approval"** on the CD stage.
 
 **Demo for your assessment:**
 - Merge a PR. CI runs, then CD pauses and an email/notification is sent.
-- Open the run → **Review** → **Approve** (add a comment) → the deploy proceeds.
+- Open the run → **Review** → **Approve** (add a comment) → the release stage proceeds.
 - Show **Pipelines → Environments → notescribe-production → Deployments** for the audit trail: who approved, when, and which commit.
 
 ---
@@ -82,5 +82,5 @@ The pipeline's CD stage targets the environment `notescribe-production`. An appr
 | 5 | PR page | **Complete** (squash merge) |
 | 6 | Pipelines → Runs | CI stage succeeds. CD shows *Waiting for approval* |
 | 7 | Run → Review | **Approve** with a comment |
-| 8 | Run summary | CD succeeds. Open the `*.azurestaticapps.net` URL |
+| 8 | Run summary → Artifacts | CD succeeds. Show the `release` artifact (versioned zip + checksum) |
 | 9 | Environments → Deployments | Audit history showing approver and commit |
