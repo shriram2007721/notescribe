@@ -7,7 +7,7 @@ import type { AutomaticSpeechRecognitionPipeline } from "@huggingface/transforme
 export const MODEL_ID = "Xenova/whisper-tiny.en";
 
 // Prebuilt bundle copied to public/ by scripts/copy-transformers.mjs (kept out of webpack on purpose).
-const VENDOR = "/vendor/transformers/";
+const VENDOR = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/vendor/transformers/`;
 
 async function loadLibrary(): Promise<typeof Transformers> {
   const lib: typeof Transformers = await import(/* webpackIgnore: true */ `${VENDOR}transformers.min.js`);

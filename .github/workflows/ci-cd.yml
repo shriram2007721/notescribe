@@ -1,0 +1,100 @@
+# =====================================================================
+# NoteScribe: CI/CD pipeline (GitHub Actions)
+#
+#   Job 1  CI  (Continuous Integration)
+#          install -> lint -> type-check -> tests -> build -> verify -> upload artifact
+#   Job 2  CD  (Continuous Delivery)
+#          [manual approval on the "github-pages" environment]
+#          deploy the artifact to GitHub Pages (free hosting, no credit card)
+#
+# Governance (configured on github.com, see GITHUB_SETUP.md):
+#   - main is protected: PR + 1 approval + CI must pass before merging.
+#   - CD waits until a required reviewer clicks "Approve and deploy".
+# =====================================================================
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # -------------------------------------------------------------------
+  ci:
+    name: "CI: Build & Test"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Configure GitHub Pages (gets the /<repo> base path)
+        id: pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+
+      - name: Install dependencies (npm ci)
+        run: npm ci
+
+      - name: "Quality: ESLint"
+        run: npm run lint
+
+      - name: "Quality: TypeScript type-check"
+        run: npx tsc --noEmit
+
+      - name: "Quality: Unit tests (if defined)"
+        run: npm test --if-present
+
+      - name: Build Next.js static export
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+
+      - name: "Smoke test: verify build output"
+        run: |
+          set -e
+          for f in index.html note.html community.html sw.js manifest.json vendor/transformers/transformers.min.js; do
+            test -f "out/$f" || { echo "::error::Missing build output: $f"; exit 1; }
+          done
+          # GitHub Pages runs Jekyll by default, which hides folders starting with "_" (like _next).
+          touch out/.nojekyll
+          echo "Build output verified."
+
+      - name: Upload build artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+  # -------------------------------------------------------------------
+  cd:
+    name: "CD: Deploy (requires approval)"
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    # Required reviewers on this environment pause the job until someone approves.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

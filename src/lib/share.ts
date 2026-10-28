@@ -18,7 +18,7 @@ export interface SharePayload {
 
 export function buildShareUrl(note: Pick<Note, "title" | "content" | "tags">, author?: string) {
   const payload: SharePayload = { v: 1, title: note.title, author, content: note.content, tags: note.tags };
-  return `${window.location.origin}/shared#${compressToEncodedURIComponent(JSON.stringify(payload))}`;
+  return `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/shared#${compressToEncodedURIComponent(JSON.stringify(payload))}`;
 }
 
 export function decodeSharePayload(fragment: string): SharePayload | null {

@@ -9,13 +9,15 @@ const geistSans = localFont({
   weight: "100 900",
 });
 
+const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
 export const metadata: Metadata = {
   title: "NoteScribe",
   description: "Offline-first notes with voice dictation and smart highlights.",
-  manifest: "/manifest.json",
+  manifest: `${base}/manifest.json`,
   applicationName: "NoteScribe",
   appleWebApp: { capable: true, title: "NoteScribe", statusBarStyle: "default" },
-  icons: { icon: "/icon.svg", apple: "/icon.svg" },
+  icons: { icon: `${base}/icon.svg`, apple: `${base}/icon.svg` },
 };
 
 export const viewport: Viewport = {
