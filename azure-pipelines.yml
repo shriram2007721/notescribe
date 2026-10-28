@@ -1,0 +1,117 @@
+# =====================================================================
+# NoteScribe: CI/CD pipeline (Azure Pipelines, multi-stage YAML)
+#
+#   Stage 1  CI  (Continuous Integration)
+#            install -> lint -> type-check -> build -> verify -> publish artifact
+#   Stage 2  CD  (Continuous Delivery)
+#            [manual approval on the "notescribe-production" environment]
+#            download artifact -> deploy to Azure Static Web Apps (Free tier)
+#
+# Governance (configured in the portal, see GOVERNANCE.md):
+#   - main is protected by a branch policy: PR + 1 reviewer + this pipeline must pass.
+#   - CD pauses until a human clicks "Approve" on the production environment.
+# =====================================================================
+
+name: $(Date:yyyyMMdd)$(Rev:.r)
+
+# Run CI/CD whenever main changes (i.e. after a PR is merged).
+trigger:
+  branches:
+    include: [main]
+  paths:
+    exclude: ["*.md"]
+
+# Azure Repos ignores YAML `pr:` triggers. PR validation is enforced by the
+# "Build validation" branch policy instead (GOVERNANCE.md, Part 1).
+pr: none
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - group: notescribe-secrets # holds the secret SWA_DEPLOYMENT_TOKEN
+  - name: NODE_VERSION
+    value: "20.x"
+  - name: npm_config_cache
+    value: $(Pipeline.Workspace)/.npm
+
+stages:
+  # -------------------------------------------------------------------
+  - stage: CI
+    displayName: "Continuous Integration (Build & Test)"
+    jobs:
+      - job: Build
+        displayName: Install, lint, test, build
+        steps:
+          - checkout: self
+            fetchDepth: 1
+
+          - task: NodeTool@0
+            displayName: Use Node.js $(NODE_VERSION)
+            inputs:
+              versionSpec: $(NODE_VERSION)
+
+          - task: Cache@2
+            displayName: Restore npm cache
+            inputs:
+              key: 'npm | "$(Agent.OS)" | package-lock.json'
+              restoreKeys: 'npm | "$(Agent.OS)"'
+              path: $(npm_config_cache)
+
+          - script: npm ci
+            displayName: Install dependencies (npm ci)
+
+          - script: npm run lint
+            displayName: "Quality: ESLint"
+
+          - script: npx tsc --noEmit
+            displayName: "Quality: TypeScript type-check"
+
+          - script: npm test --if-present
+            displayName: "Quality: Unit tests (if defined)"
+
+          # prebuild copies the in-browser AI runtime into public/vendor; output lands in ./out
+          - script: npm run build
+            displayName: Build Next.js static export
+            env:
+              NEXT_TELEMETRY_DISABLED: 1
+
+          - script: |
+              set -e
+              for f in index.html note.html community.html sw.js manifest.json staticwebapp.config.json vendor/transformers/transformers.min.js; do
+                test -f "out/$f" || { echo "##vso[task.logissue type=error]Missing build output: $f"; exit 1; }
+              done
+              echo "Build output verified."
+            displayName: "Smoke test: verify build output"
+
+          - publish: out
+            artifact: site
+            displayName: Publish build artifact (site)
+
+  # -------------------------------------------------------------------
+  - stage: CD
+    displayName: "Continuous Delivery (Deploy to Azure)"
+    dependsOn: CI
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      # A "deployment" job targets an Environment; approvals and checks on that
+      # environment pause the run here until someone clicks Approve.
+      - deployment: DeployWeb
+        displayName: Deploy to Azure Static Web Apps
+        environment: notescribe-production
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: site
+                  displayName: Download build artifact
+
+                - task: AzureStaticWebApp@0
+                  displayName: Upload site to Static Web Apps
+                  inputs:
+                    app_location: /
+                    cwd: $(Pipeline.Workspace)/site
+                    skip_app_build: true
+                    skip_api_build: true
+                    azure_static_web_apps_api_token: $(SWA_DEPLOYMENT_TOKEN)
