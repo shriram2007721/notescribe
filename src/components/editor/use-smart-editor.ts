@@ -2,9 +2,8 @@
 
 import Placeholder from "@tiptap/extension-placeholder";
 import { useEditor, type Editor, type JSONContent } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
 import { useRef } from "react";
-import { SmartHighlight } from "./smart-highlight";
+import { baseExtensions } from "./extensions";
 
 export function useSmartEditor({
   content,
@@ -19,16 +18,17 @@ export function useSmartEditor({
   onUpdateRef.current = onUpdate;
 
   return useEditor({
-    extensions: [
-      SmartHighlight,
-      StarterKit,
-      Placeholder.configure({ placeholder: "Start typing, or tap the mic to dictate…" }),
-    ],
+    extensions: [...baseExtensions, Placeholder.configure({ placeholder: "Start typing, or open the recorder to dictate…" })],
     content,
     editable,
     immediatelyRender: false,
     editorProps: {
-      attributes: { class: "tiptap-content focus:outline-none min-h-[50vh] py-4" },
+      attributes: {
+        class: "tiptap-content focus:outline-none min-h-[55vh] py-4",
+        "aria-label": "Note content",
+        role: "textbox",
+        "aria-multiline": "true",
+      },
     },
     onUpdate: ({ editor }) => onUpdateRef.current?.(editor),
   });

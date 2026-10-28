@@ -19,10 +19,15 @@ export default function CommunityPage() {
   const visible = posts?.filter((p) => !tag || p.tags.includes(tag));
 
   return (
-    <main className="container py-8">
+    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Community feed</h1>
-        <p className="text-sm text-muted-foreground">Notes other learners have shared, with their highlights.</p>
+        <p className="text-sm text-muted-foreground">Notes shared with their highlights.</p>
+        <p role="note" className="mt-3 rounded-md border bg-muted/50 p-3 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Demo mode:</span> this feed is stored only in this browser. Posts you publish are not visible to
+          anyone else, and posts marked “Sample” are built-in examples. To share a note with a real person, use <span className="font-medium">Share → Public
+          link</span> on the note.
+        </p>
       </div>
 
       <div className="mb-6 flex flex-wrap gap-1.5">
@@ -57,7 +62,10 @@ export default function CommunityPage() {
                 {p.author.slice(0, 1).toUpperCase()}
               </span>
               <div className="text-xs leading-tight">
-                <p className="font-medium">{p.author}</p>
+                <p className="font-medium">
+                  {p.author}
+                  {p.id.startsWith("seed-") && <span className="ml-1.5 rounded bg-muted px-1 py-0.5 text-[10px] font-normal text-muted-foreground">Sample</span>}
+                </p>
                 <p className="text-muted-foreground">{new Date(p.publishedAt).toLocaleDateString()}</p>
               </div>
             </div>
@@ -80,6 +88,6 @@ export default function CommunityPage() {
         ))}
       </ul>
       {visible?.length === 0 && <p className="py-12 text-center text-sm text-muted-foreground">No posts with that highlight yet.</p>}
-    </main>
+    </div>
   );
 }

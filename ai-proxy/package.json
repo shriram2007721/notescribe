@@ -1,0 +1,14 @@
+{
+  "name": "notescribe-ai-proxy",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

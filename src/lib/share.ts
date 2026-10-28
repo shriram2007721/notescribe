@@ -1,6 +1,7 @@
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from "lz-string";
 import { nanoid } from "nanoid";
-import { db, getSetting, setSetting, updateNote, type CommunityPost, type HighlightTag, type Note } from "@/lib/db";
+import { db, getSetting, setSetting, type CommunityPost, type HighlightTag, type Note } from "@/lib/db";
+import { updateNote } from "@/lib/notes";
 import { SEED_POSTS } from "@/lib/seed";
 
 /* ------------------------------------------------------------------ */

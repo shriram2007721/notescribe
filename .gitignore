@@ -44,3 +44,8 @@ next-env.d.ts
 /public/swe-worker-*.js
 
 /public/vendor
+
+# AI proxy
+/ai-proxy/node_modules
+/ai-proxy/.dev.vars
+/ai-proxy/.wrangler

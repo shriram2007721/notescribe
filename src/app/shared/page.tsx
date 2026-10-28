@@ -8,7 +8,8 @@ import { Suspense, useEffect, useState } from "react";
 import { HighlightExtractor } from "@/components/editor/highlight-extractor";
 import { useSmartEditor } from "@/components/editor/use-smart-editor";
 import { Button } from "@/components/ui/button";
-import { createNote, type HighlightTag } from "@/lib/db";
+import type { HighlightTag } from "@/lib/db";
+import { createNote } from "@/lib/notes";
 import { community, decodeSharePayload } from "@/lib/share";
 
 interface Viewable {
@@ -39,10 +40,10 @@ function SharedLoader() {
   if (data === undefined) return null;
   if (data === null) {
     return (
-      <main className="container py-16 text-center">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 py-16 text-center">
         <p className="font-medium">This shared note couldn&apos;t be opened.</p>
         <p className="text-sm text-muted-foreground">The link may be incomplete or corrupted.</p>
-      </main>
+      </div>
     );
   }
   return <SharedView data={data} fromCommunity={!!postId} />;
@@ -64,7 +65,7 @@ function SharedView({ data, fromCommunity }: { data: Viewable; fromCommunity: bo
   };
 
   return (
-    <main className="container py-6">
+    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6">
       <div className="mb-4 flex flex-wrap items-center gap-3">
         {fromCommunity && (
           <Link href="/community" className="rounded-md p-2 hover:bg-accent" aria-label="Back to community">
@@ -88,6 +89,6 @@ function SharedView({ data, fromCommunity }: { data: Viewable; fromCommunity: bo
           <HighlightExtractor editor={editor} className="lg:sticky lg:top-4 lg:self-start" />
         </div>
       )}
-    </main>
+    </div>
   );
 }

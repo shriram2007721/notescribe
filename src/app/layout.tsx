@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
-import { AppHeader } from "@/components/app-header";
+import { AppShell } from "@/components/shell/app-shell";
+import { FeedbackProvider } from "@/components/ui/feedback";
+import { THEME_INIT_SCRIPT } from "@/lib/theme-script";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -12,8 +14,8 @@ const geistSans = localFont({
 const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 export const metadata: Metadata = {
-  title: "NoteScribe",
-  description: "Offline-first notes with voice dictation and smart highlights.",
+  title: { default: "NoteScribe", template: "%s · NoteScribe" },
+  description: "Offline-first study notes with voice dictation, smart highlights, flashcards and quizzes.",
   manifest: `${base}/manifest.json`,
   applicationName: "NoteScribe",
   appleWebApp: { capable: true, title: "NoteScribe", statusBarStyle: "default" },
@@ -21,17 +23,25 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#4f46e5",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f1219" },
+  ],
   width: "device-width",
   initialScale: 1,
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Applies the saved theme before first paint to avoid a flash of the wrong theme. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className={`${geistSans.variable} min-h-screen font-sans`}>
-        <AppHeader />
-        {children}
+        <FeedbackProvider>
+          <AppShell>{children}</AppShell>
+        </FeedbackProvider>
       </body>
     </html>
   );

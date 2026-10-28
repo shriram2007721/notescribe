@@ -28,7 +28,9 @@ export function EditorToolbar({ editor, trailing }: { editor: Editor; trailing?:
   ];
 
   return (
-    <div className="sticky top-0 z-10 flex flex-wrap items-center gap-1 border-b bg-background/95 py-2 backdrop-blur">
+    <div className="sticky top-0 z-10 -mx-1 flex items-center gap-2 border-b bg-background/95 px-1 py-2 backdrop-blur">
+      {/* Only the formatting buttons scroll on narrow screens; the trailing actions stay visible. */}
+      <div role="toolbar" aria-label="Formatting" className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
       {fmt.map(({ icon: Icon, label, active, run }) => (
         <button
           key={label}
@@ -38,16 +40,17 @@ export function EditorToolbar({ editor, trailing }: { editor: Editor; trailing?:
           aria-pressed={active}
           onClick={run}
           className={cn(
-            "inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent",
+            "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-accent",
             active && "bg-accent text-foreground",
           )}
         >
           <Icon className="h-4 w-4" />
         </button>
       ))}
-      <div className="mx-1 h-6 w-px bg-border" />
+      <div className="mx-1 h-6 w-px shrink-0 bg-border" />
       <HighlightButtons editor={editor} />
-      {trailing && <div className="ml-auto">{trailing}</div>}
+      </div>
+      {trailing && <div className="shrink-0">{trailing}</div>}
     </div>
   );
 }

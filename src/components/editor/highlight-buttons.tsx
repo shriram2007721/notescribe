@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 export function HighlightButtons({ editor, compact = false }: { editor: Editor; compact?: boolean }) {
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex shrink-0 items-center gap-1">
       {HIGHLIGHT_ORDER.map((tag) => {
         const h = HIGHLIGHTS[tag];
         const active = editor.isActive("smartHighlight", { tag });
@@ -24,7 +24,7 @@ export function HighlightButtons({ editor, compact = false }: { editor: Editor; 
             )}
           >
             <span aria-hidden>{h.icon}</span>
-            {!compact && <span className="hidden sm:inline">{h.short}</span>}
+            {!compact && <span className="hidden 2xl:inline">{h.short}</span>}
           </button>
         );
       })}

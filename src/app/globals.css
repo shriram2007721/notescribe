@@ -117,3 +117,30 @@
 .smart-hl[data-tag="concept"]::before {
   content: "💡";
 }
+
+/* ---------- Focus (distraction-free) mode ---------- */
+html[data-focus] [data-chrome] {
+  display: none !important;
+}
+html[data-focus] .app-main {
+  padding-left: 0;
+}
+
+/* ---------- Print / Save as PDF (note page) ---------- */
+@media print {
+  [data-chrome],
+  [data-no-print] {
+    display: none !important;
+  }
+  .app-main {
+    padding-left: 0 !important;
+  }
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .smart-hl {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

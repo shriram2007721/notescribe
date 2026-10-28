@@ -67,8 +67,8 @@ stages:
           - script: npx tsc --noEmit
             displayName: "Quality: TypeScript type-check"
 
-          - script: npm test --if-present
-            displayName: "Quality: Unit tests (if defined)"
+          - script: npm test
+            displayName: "Quality: Unit tests (Vitest)"
 
           # prebuild copies the in-browser AI runtime into public/vendor; output lands in ./out
           - script: npm run build

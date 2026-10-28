@@ -3,45 +3,74 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { WorkerResponse } from "@/workers/whisper.worker";
 
-export type VoiceStatus = "idle" | "loading" | "ready" | "recording" | "transcribing" | "error";
+export type VoiceStatus = "idle" | "recording" | "paused" | "transcribing" | "review" | "error";
 
 const SAMPLE_RATE = 16_000; // what Whisper expects
+export const MAX_RECORDING_MS = 30 * 60_000; // keeps memory and transcription time reasonable
 
-/** Records from the mic and transcribes locally with Whisper in a Web Worker. */
-export function useWhisper(onText: (text: string) => void) {
+export function voiceSupport(): string | null {
+  if (typeof window === "undefined") return null;
+  if (!window.isSecureContext) return "Recording needs a secure (https) connection.";
+  if (!navigator.mediaDevices?.getUserMedia) return "This browser can't access a microphone.";
+  if (typeof MediaRecorder === "undefined") return "This browser doesn't support audio recording (MediaRecorder).";
+  if (typeof Worker === "undefined" || typeof WebAssembly === "undefined") return "This browser can't run the on-device speech model.";
+  return null;
+}
+
+function micError(err: unknown) {
+  const name = err instanceof DOMException ? err.name : "";
+  if (name === "NotAllowedError" || name === "SecurityError") return "Microphone access was blocked. Allow it from the address bar's site settings, then try again.";
+  if (name === "NotFoundError" || name === "OverconstrainedError") return "No microphone was found. Connect one and try again.";
+  if (name === "NotReadableError") return "The microphone is being used by another app. Close it and try again.";
+  return "Couldn't start the microphone.";
+}
+
+/**
+ * Records from the mic and transcribes locally with Whisper in a Web Worker.
+ * Audio never leaves the device; the model is downloaded once and cached by the browser.
+ * The transcript is exposed for review instead of being inserted automatically.
+ */
+export function useWhisper() {
   const [status, setStatus] = useState<VoiceStatus>("idle");
-  const [progress, setProgress] = useState<number | null>(null);
+  const [modelProgress, setModelProgress] = useState<number | null>(null);
+  const [modelReady, setModelReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [transcript, setTranscript] = useState("");
 
   const workerRef = useRef<Worker | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
-  const readyRef = useRef(false);
-  const onTextRef = useRef(onText);
-  onTextRef.current = onText;
+  const streamRef = useRef<MediaStream | null>(null);
+  const discardRef = useRef(false);
+  const clock = useRef({ startedAt: 0, accumulated: 0, timer: 0 as ReturnType<typeof setInterval> | 0 });
+
+  const stopTracks = () => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+  };
+
+  function tickStop() {
+    if (clock.current.timer) clearInterval(clock.current.timer);
+    clock.current.timer = 0;
+  }
 
   const getWorker = useCallback(() => {
     if (workerRef.current) return workerRef.current;
     const worker = new Worker(new URL("../workers/whisper.worker.ts", import.meta.url), { type: "module" });
     worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
       const msg = e.data;
-      switch (msg.type) {
-        case "progress":
-          setProgress(msg.progress);
-          break;
-        case "ready":
-          readyRef.current = true;
-          setProgress(null);
-          setStatus((s) => (s === "loading" ? "ready" : s));
-          break;
-        case "result":
-          setStatus("ready");
-          if (msg.text) onTextRef.current(msg.text);
-          break;
-        case "error":
-          setProgress(null);
-          setError(msg.message);
-          setStatus("error");
-          break;
+      if (msg.type === "progress") setModelProgress(msg.progress);
+      else if (msg.type === "ready") {
+        setModelReady(true);
+        setModelProgress(null);
+      } else if (msg.type === "result") {
+        setTranscript(msg.text);
+        setStatus(msg.text ? "review" : "error");
+        if (!msg.text) setError("No speech was detected in the recording.");
+      } else if (msg.type === "error") {
+        setModelProgress(null);
+        setError(msg.message);
+        setStatus("error");
       }
     };
     workerRef.current = worker;
@@ -50,36 +79,61 @@ export function useWhisper(onText: (text: string) => void) {
 
   useEffect(
     () => () => {
+      // Always release the microphone and worker when the component goes away.
+      discardRef.current = true;
+      tickStop();
+      if (recorderRef.current?.state !== "inactive") recorderRef.current?.stop();
+      stopTracks();
       workerRef.current?.terminate();
-      recorderRef.current?.stream.getTracks().forEach((t) => t.stop());
     },
     [],
   );
 
-  /** Downloads/warms the model without recording (e.g. "prepare for offline"). */
-  const preload = useCallback(() => {
-    if (readyRef.current) return;
-    setError(null);
-    setStatus("loading");
-    getWorker().postMessage({ type: "load" });
-  }, [getWorker]);
+  // Clock helpers only touch refs and state setters, so they are stable for the hook's lifetime.
+  const startClock = useCallback(() => {
+    clock.current.startedAt = Date.now();
+    tickStop();
+    clock.current.timer = setInterval(() => {
+      const ms = currentElapsed(clock.current);
+      setElapsed(ms);
+      if (ms >= MAX_RECORDING_MS && recorderRef.current?.state !== "inactive") recorderRef.current?.stop();
+    }, 250);
+  }, []);
+
+  const pauseClock = useCallback(() => {
+    clock.current.accumulated = currentElapsed(clock.current);
+    clock.current.startedAt = 0;
+    tickStop();
+  }, []);
 
   const start = useCallback(async () => {
+    const unsupported = voiceSupport();
+    if (unsupported) {
+      setError(unsupported);
+      setStatus("error");
+      return;
+    }
     setError(null);
-    let stream: MediaStream;
+    setTranscript("");
+    discardRef.current = false;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      setError("Microphone access was blocked. Allow it in your browser settings.");
+      streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      setError(micError(err));
       setStatus("error");
       return;
     }
 
-    const recorder = new MediaRecorder(stream);
+    const recorder = new MediaRecorder(streamRef.current);
     const chunks: Blob[] = [];
     recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
     recorder.onstop = async () => {
-      stream.getTracks().forEach((t) => t.stop());
+      pauseClock();
+      stopTracks();
+      if (discardRef.current) {
+        setStatus("idle");
+        return;
+      }
       setStatus("transcribing");
       try {
         const audio = await decodeToMono16k(new Blob(chunks, { type: recorder.mimeType }));
@@ -91,17 +145,66 @@ export function useWhisper(onText: (text: string) => void) {
     };
 
     recorderRef.current = recorder;
-    recorder.start();
+    clock.current.accumulated = 0;
+    setElapsed(0);
+    recorder.start(1000);
+    startClock();
     setStatus("recording");
-    // Load the model in parallel with recording so it's ready when the user stops.
-    if (!readyRef.current) getWorker().postMessage({ type: "load" });
-  }, [getWorker]);
+    // Load the model while the user is speaking so it's ready when they stop.
+    getWorker().postMessage({ type: "load" });
+  }, [getWorker, pauseClock, startClock]);
 
   const stop = useCallback(() => {
-    if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+    const r = recorderRef.current;
+    if (r && r.state !== "inactive") r.stop();
   }, []);
 
-  return { status, progress, error, start, stop, preload };
+  const pause = useCallback(() => {
+    if (recorderRef.current?.state === "recording") {
+      recorderRef.current.pause();
+      pauseClock();
+      setStatus("paused");
+    }
+  }, [pauseClock]);
+
+  const resume = useCallback(() => {
+    if (recorderRef.current?.state === "paused") {
+      recorderRef.current.resume();
+      startClock();
+      setStatus("recording");
+    }
+  }, [startClock]);
+
+  /** Throws away the current recording (or reviewed transcript). */
+  const discard = useCallback(() => {
+    discardRef.current = true;
+    const r = recorderRef.current;
+    if (r && r.state !== "inactive") r.stop();
+    else setStatus("idle");
+    stopTracks();
+    setTranscript("");
+    setError(null);
+    setElapsed(0);
+  }, []);
+
+  const reset = useCallback(() => {
+    setStatus("idle");
+    setTranscript("");
+    setError(null);
+    setElapsed(0);
+  }, []);
+
+  /** Downloads/warms the model without recording ("prepare for offline"). */
+  const preload = useCallback(() => {
+    setError(null);
+    getWorker().postMessage({ type: "load" });
+  }, [getWorker]);
+
+  return { status, modelProgress, modelReady, error, elapsed, transcript, setTranscript, start, stop, pause, resume, discard, reset, preload };
+}
+
+function currentElapsed(c: { accumulated: number; startedAt: number }) {
+  return c.accumulated + (c.startedAt ? Date.now() - c.startedAt : 0);
 }
 
 async function decodeToMono16k(blob: Blob): Promise<Float32Array> {

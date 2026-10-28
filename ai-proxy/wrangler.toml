@@ -1,0 +1,12 @@
+name = "notescribe-ai-proxy"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+[vars]
+# Origins allowed to call the proxy (comma-separated). Update with your GitHub Pages origin.
+ALLOWED_ORIGINS = "https://shriram2007721.github.io,http://localhost:3000"
+GEMINI_MODEL = "gemini-2.5-flash"
+RATE_LIMIT_PER_10_MIN = "30"
+
+# The API key is a secret, never put it here. Set it with:
+#   npx wrangler secret put GEMINI_API_KEY
