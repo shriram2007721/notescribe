@@ -309,7 +309,8 @@ export function NoteWorkspace({ note }: { note: Note }) {
                 }
               />
             </div>
-            {recorderOpen && <RecorderPanel editor={editor} onClose={() => setRecorderOpen(false)} />}
+            {/* Stable wrapper: BubbleMenu moves its own DOM node, so React must never insert siblings next to it. */}
+            <div>{recorderOpen && <RecorderPanel editor={editor} onClose={() => setRecorderOpen(false)} />}</div>
             <BubbleMenu
               editor={editor}
               shouldShow={({ editor: ed, state }) => ed.isEditable && !state.selection.empty}
