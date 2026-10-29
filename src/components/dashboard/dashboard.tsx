@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpDown, GraduationCap, Layers, Mic, Pencil, Pin, Plus, Search, Star, Trash2, Upload, X } from "lucide-react";
+import { ArrowUpDown, GraduationCap, Layers, Mic, Pencil, Pin, Plus, Search, Sparkles, Star, Trash2, Upload, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
@@ -13,6 +13,7 @@ import type { HighlightTag } from "@/lib/db";
 import { deleteFolder } from "@/lib/folders";
 import { HIGHLIGHTS, HIGHLIGHT_ORDER, HIGHLIGHT_STYLES } from "@/lib/highlights";
 import { createNote, emptyTrash, filterNotes, type NoteSort } from "@/lib/notes";
+import { loadSampleData } from "@/lib/sample-data";
 import { computeStats } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import { NoteCard } from "./note-card";
@@ -389,6 +390,9 @@ function FirstRun({ onNew, onRecord }: { onNew: () => void; onRecord: () => void
         <Link href="/settings#import" className={buttonVariants({ variant: "ghost" })}>
           <Upload className="h-4 w-4" /> Import notes
         </Link>
+        <Button variant="ghost" onClick={() => loadSampleData({ force: true })}>
+          <Sparkles className="h-4 w-4" /> Load sample notes
+        </Button>
       </div>
     </div>
   );

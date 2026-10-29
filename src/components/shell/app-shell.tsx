@@ -23,6 +23,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { useFolders } from "@/hooks/use-data";
 import { useOnline } from "@/hooks/use-online";
+import { loadSampleData } from "@/lib/sample-data";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { CommandPalette } from "./command-palette";
@@ -45,6 +46,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   // Close the mobile drawer on navigation.
   useEffect(() => setDrawerOpen(false), [pathname]);
+
+  // First visit: fill the empty notebook with sample notes, flashcards and quiz history (runs once).
+  useEffect(() => {
+    loadSampleData().catch(() => {});
+  }, []);
 
   // Ctrl/Cmd+K opens the command palette from anywhere.
   useEffect(() => {
