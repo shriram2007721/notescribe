@@ -5,11 +5,11 @@ import { useEffect, useState, type ReactNode } from "react";
 import { ImportPanel } from "@/components/settings/import-panel";
 import { Button } from "@/components/ui/button";
 import { useFeedback } from "@/components/ui/feedback";
-import { Input, Label } from "@/components/ui/input";
+import { Input, Label, Textarea } from "@/components/ui/input";
 import { useWhisper } from "@/hooks/use-whisper";
 import { isValidProxyUrl, setAIConsent, setAIUrl, useAIConfig } from "@/lib/ai/config";
 import { createBackup } from "@/lib/backup";
-import { db } from "@/lib/db";
+import { db, getSetting, setSetting } from "@/lib/db";
 import { downloadText } from "@/lib/download";
 import { docToMarkdown } from "@/lib/markdown";
 import { loadSampleData } from "@/lib/sample-data";
@@ -269,6 +269,37 @@ function VoiceModel() {
         {v.modelReady && <span className="text-green-700 dark:text-green-400">Ready for offline use on this device.</span>}
         {v.error && <span className="text-destructive">{v.error}</span>}
       </div>
+      <VoiceVocabulary />
     </Section>
+  );
+}
+
+/** Names and terms the speech model often mishears; close spellings are corrected to these. */
+function VoiceVocabulary() {
+  const { toast } = useFeedback();
+  const [text, setText] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    getSetting("voiceVocabulary", "").then((t) => {
+      setText(t);
+      setLoaded(true);
+    });
+  }, []);
+  return (
+    <div className="mt-5 space-y-2">
+      <Label htmlFor="vocab">Names and terms to recognise</Label>
+      <p className="text-xs text-muted-foreground">One per line or comma-separated, for example teacher and classmate names, or course terms. Misheard versions are corrected to these when you stop recording.</p>
+      <Textarea id="vocab" value={text} onChange={(e) => setText(e.target.value)} disabled={!loaded} className="min-h-24" />
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={async () => {
+          await setSetting("voiceVocabulary", text);
+          toast({ title: "Vocabulary saved", tone: "success" });
+        }}
+      >
+        Save vocabulary
+      </Button>
+    </div>
   );
 }

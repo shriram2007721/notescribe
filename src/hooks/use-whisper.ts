@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getSetting } from "@/lib/db";
+import { applyVocabulary } from "@/lib/vocab";
 import type { WorkerResponse } from "@/workers/whisper.worker";
 
 export type VoiceStatus = "idle" | "recording" | "paused" | "transcribing" | "review" | "error";
@@ -86,9 +88,17 @@ export function useWhisper() {
           setLiveText(l.text);
         } else setLiveText([l.text, msg.text].filter(Boolean).join(" "));
       } else if (msg.type === "result") {
-        setTranscript(msg.text);
-        setStatus(msg.text ? "review" : "error");
-        if (!msg.text) setError("No speech was detected in the recording.");
+        if (!msg.text) {
+          setTranscript("");
+          setStatus("error");
+          setError("No speech was detected in the recording.");
+          return;
+        }
+        // Correct known names and terms before the reviewer sees the text.
+        getSetting("voiceVocabulary", "").then((vocab) => {
+          setTranscript(applyVocabulary(msg.text, vocab));
+          setStatus("review");
+        });
       } else if (msg.type === "error") {
         setModelProgress(null);
         setError(msg.message);
