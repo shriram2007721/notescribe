@@ -222,6 +222,18 @@ export function NoteWorkspace({ note }: { note: Note }) {
         >
           {focusMode ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={async () => {
+            await flush();
+            toast({ title: "Note saved", tone: "success" });
+          }}
+          disabled={saveState === "saving"}
+          aria-label="Save note"
+        >
+          <Check className="h-4 w-4" /> Save
+        </Button>
         {!focusMode && (
           <Button size="sm" variant={note.shareId ? "secondary" : "outline"} onClick={() => setShareOpen(true)} className="hidden sm:inline-flex">
             {note.shareId ? <Globe className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
