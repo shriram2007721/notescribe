@@ -20,6 +20,7 @@ export function ShareDialog({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [author, setAuthor] = useState("");
+  const [anonymous, setAnonymous] = useState(true);
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -42,7 +43,7 @@ export function ShareDialog({
 
   const makeLink = async () => {
     const n = await latest();
-    setLink(buildShareUrl(n, author || undefined));
+    setLink(buildShareUrl(n, anonymous ? undefined : author.trim() || undefined));
   };
 
   const copy = async () => {
@@ -53,9 +54,11 @@ export function ShareDialog({
   };
 
   const publish = async () => {
+    const name = anonymous ? "" : author.trim();
+    if (!anonymous && !name) return;
     setBusy(true);
-    await setSetting("authorName", author);
-    await publishNote(await latest(), author);
+    if (!anonymous) await setSetting("authorName", name);
+    await publishNote(await latest(), anonymous ? "Anonymous" : name);
     setBusy(false);
   };
 
@@ -83,15 +86,27 @@ export function ShareDialog({
           </button>
         </div>
 
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium">Display name</span>
-          <input
-            value={author}
-            onChange={(e) => setAuthor(e.target.value)}
-            placeholder="Anonymous"
-            className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-        </label>
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium">Post to community as</legend>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="radio" name="post-as" checked={anonymous} onChange={() => setAnonymous(true)} />
+            Anonymous
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="radio" name="post-as" checked={!anonymous} onChange={() => setAnonymous(false)} />
+            My name
+          </label>
+          {!anonymous && (
+            <input
+              value={author}
+              onChange={(e) => setAuthor(e.target.value)}
+              placeholder="Your name"
+              aria-label="Your name"
+              maxLength={60}
+              className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          )}
+        </fieldset>
 
         <section className="space-y-2">
           <h3 className="flex items-center gap-2 text-sm font-medium">
@@ -137,7 +152,7 @@ export function ShareDialog({
           ) : (
             <>
               <p className="text-xs text-muted-foreground">Post this note so other students can learn from your highlights.</p>
-              <Button size="sm" onClick={publish} disabled={busy}>
+              <Button size="sm" onClick={publish} disabled={busy || (!anonymous && !author.trim())}>
                 Share to Community
               </Button>
             </>
