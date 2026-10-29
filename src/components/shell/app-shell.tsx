@@ -52,6 +52,20 @@ export function AppShell({ children }: { children: ReactNode }) {
     loadSampleData().catch(() => {});
   }, []);
 
+  // When a newer deploy's service worker takes over, reload once so the new version is shown.
+  useEffect(() => {
+    const sw = navigator.serviceWorker;
+    if (!sw?.controller) return; // first install: the page is already current
+    let reloaded = false;
+    const onChange = () => {
+      if (reloaded) return;
+      reloaded = true;
+      window.location.reload();
+    };
+    sw.addEventListener("controllerchange", onChange);
+    return () => sw.removeEventListener("controllerchange", onChange);
+  }, []);
+
   // Ctrl/Cmd+K opens the command palette from anywhere.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

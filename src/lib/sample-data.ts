@@ -179,7 +179,7 @@ const PUBLISHED = [
 
 let running: Promise<boolean> | null = null;
 
-/** Loads the sample set. Without `force` it only runs once, and only into an empty notebook. */
+/** Loads the sample set once per browser (added alongside any existing notes); `force` loads it again. */
 export function loadSampleData({ force = false } = {}) {
   // Two components (or React's dev double-effect) may ask at once; share one run.
   running ??= seed(force).finally(() => (running = null));
@@ -187,7 +187,7 @@ export function loadSampleData({ force = false } = {}) {
 }
 
 async function seed(force: boolean) {
-  if (!force && ((await getSetting("sampleSeeded", false)) || (await db.notes.count()) > 0)) return false;
+  if (!force && (await getSetting("sampleSeeded", false))) return false;
   await setSetting("sampleSeeded", true);
   await importBackup(buildSampleBackup());
   await ensureCommunitySeeded();

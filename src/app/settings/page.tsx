@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Download, HardDrive, Loader2, Mic, Monitor, Moon, Sun, XCircle } from "lucide-react";
+import { CheckCircle2, Download, HardDrive, Loader2, Mic, Monitor, Moon, Sparkles, Sun, XCircle } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { ImportPanel } from "@/components/settings/import-panel";
 import { Button } from "@/components/ui/button";
@@ -12,10 +12,33 @@ import { createBackup } from "@/lib/backup";
 import { db } from "@/lib/db";
 import { downloadText } from "@/lib/download";
 import { docToMarkdown } from "@/lib/markdown";
+import { loadSampleData } from "@/lib/sample-data";
 import { useTheme, type ThemePreference } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 const stamp = () => new Date().toISOString().slice(0, 10);
+
+function SampleData() {
+  const { toast } = useFeedback();
+  const [busy, setBusy] = useState(false);
+  const load = async () => {
+    setBusy(true);
+    try {
+      await loadSampleData({ force: true });
+      toast({ title: "Sample notes, flashcards and quizzes added", tone: "success" });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <Button variant="outline" onClick={load} disabled={busy}>
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Load sample notes
+      </Button>
+      <p className="text-xs text-muted-foreground">Added as new copies next to your own notes; nothing is replaced.</p>
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   return (
@@ -29,6 +52,9 @@ export default function SettingsPage() {
         </Section>
         <Section id="import" title="Import" description="Restore a backup or bring in Markdown notes.">
           <ImportPanel />
+        </Section>
+        <Section id="samples" title="Sample study material" description="Example subjects, highlighted notes, flashcards, quiz results and community posts.">
+          <SampleData />
         </Section>
         <Storage />
         <VoiceModel />

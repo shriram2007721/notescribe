@@ -26,9 +26,10 @@ describe("sample data", () => {
     expect(await db.notes.count()).toBe(notes);
   });
 
-  it("leaves an existing notebook alone unless forced", async () => {
-    await createNote({ title: "Mine" });
-    expect(await loadSampleData()).toBe(false);
-    expect(await db.notes.count()).toBe(1);
+  it("adds samples next to existing notes without touching them", async () => {
+    const mine = await createNote({ title: "Mine" });
+    expect(await loadSampleData()).toBe(true);
+    expect(await db.notes.get(mine.id)).toMatchObject({ title: "Mine" });
+    expect(await db.cards.count()).toBeGreaterThan(0);
   });
 });

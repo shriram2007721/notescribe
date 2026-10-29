@@ -14,6 +14,9 @@ const withPWA = withPWAInit({
   extendDefaultRuntimeCaching: true,
   workboxOptions: {
     disableDevLogs: true,
+    // Activate a new deploy straight away; AppShell reloads once when it takes over.
+    skipWaiting: true,
+    clientsClaim: true,
     // App-shell routes that must open offline even if never visited.
     additionalManifestEntries: ["/", "/note", "/flashcards", "/flashcards/review", "/study", "/settings", "/community", "/shared", "/offline"].map((url) => ({ url: `${basePath}${url}`, revision })),
     // transformers.js + its WASM runtime (20+ MB) exceed Workbox's 2 MB precache limit, so cache them on first use instead.
