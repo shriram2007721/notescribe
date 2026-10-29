@@ -3,7 +3,7 @@ import type { JSONContent } from "@tiptap/react";
 import { marked } from "marked";
 import { baseExtensions } from "@/components/editor/extensions";
 import type { HighlightTag } from "./db";
-import { extractHighlightsFromJSON, HIGHLIGHT_ORDER } from "./highlights";
+import { extractHighlightsFromJSON, tagOrder } from "./highlights";
 
 /*
  * Markdown <-> TipTap JSON.
@@ -182,7 +182,7 @@ export function docToPlainText(doc: unknown): string {
 
 export function tagsFromDoc(doc: unknown): HighlightTag[] {
   const found = new Set(extractHighlightsFromJSON(doc).map((h) => h.tag));
-  return HIGHLIGHT_ORDER.filter((t) => found.has(t));
+  return tagOrder().filter((t) => found.has(t)).concat(Array.from(found).filter((t) => !tagOrder().includes(t)));
 }
 
 /** Converts a Markdown file into the fields of a new note. */

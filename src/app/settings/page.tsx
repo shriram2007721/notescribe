@@ -13,10 +13,86 @@ import { db, getSetting, setSetting } from "@/lib/db";
 import { downloadText } from "@/lib/download";
 import { docToMarkdown } from "@/lib/markdown";
 import { loadSampleData } from "@/lib/sample-data";
+import { getTags, resetTags, saveTags, TAG_HUES, type TagDef } from "@/lib/highlights";
 import { useTheme, type ThemePreference } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { nanoid } from "nanoid";
 
 const stamp = () => new Date().toISOString().slice(0, 10);
+
+function TagEditor() {
+  const { toast } = useFeedback();
+  const [tags, setTags] = useState<TagDef[]>(() => getTags());
+  const update = (i: number, patch: Partial<TagDef>) => setTags((ts) => ts.map((t, j) => (j === i ? { ...t, ...patch } : t)));
+  const add = () =>
+    setTags((ts) => [...ts, { id: nanoid(6), label: "New tag", short: "New", icon: "🏷️", hue: TAG_HUES[ts.length % TAG_HUES.length] }]);
+  const remove = (i: number) => setTags((ts) => ts.filter((_, j) => j !== i));
+
+  const save = () => {
+    const clean = tags.map((t) => ({ ...t, label: t.label.trim(), icon: t.icon.trim() || "🏷️", short: t.label.trim().slice(0, 12) }));
+    if (!clean.length || clean.some((t) => !t.label)) {
+      toast({ title: "Every tag needs a name", tone: "error" });
+      return;
+    }
+    saveTags(clean);
+    window.location.reload(); // editors read the tag list when they load
+  };
+
+  return (
+    <div className="space-y-3">
+      <ul className="space-y-2">
+        {tags.map((t, i) => (
+          <li key={t.id} className="flex flex-wrap items-center gap-2 rounded-md border p-2">
+            <Input
+              aria-label="Tag icon"
+              value={t.icon}
+              maxLength={4}
+              onChange={(e) => update(i, { icon: e.target.value })}
+              className="w-14 text-center"
+            />
+            <Input aria-label="Tag name" value={t.label} maxLength={40} onChange={(e) => update(i, { label: e.target.value })} className="min-w-40 flex-1" />
+            <div className="flex gap-1" role="radiogroup" aria-label="Tag colour">
+              {TAG_HUES.map((h) => (
+                <button
+                  key={h}
+                  type="button"
+                  role="radio"
+                  aria-checked={t.hue === h}
+                  aria-label={`Colour ${h}`}
+                  onClick={() => update(i, { hue: h })}
+                  className={cn("h-6 w-6 rounded-full border-2", t.hue === h ? "border-foreground" : "border-transparent")}
+                  style={{ backgroundColor: `hsl(${h} 85% 70%)` }}
+                />
+              ))}
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => remove(i)} aria-label={`Remove ${t.label}`}>
+              Remove
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs text-muted-foreground">Removing a tag keeps the highlights in your notes; they show a 🏷️ icon instead.</p>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={add}>
+          + Add tag
+        </Button>
+        <Button size="sm" onClick={save}>
+          Save and apply
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            resetTags();
+            window.location.reload();
+          }}
+        >
+          Reset to defaults
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 function SampleData() {
   const { toast } = useFeedback();
@@ -52,6 +128,9 @@ export default function SettingsPage() {
         </Section>
         <Section id="import" title="Import" description="Restore a backup or bring in Markdown notes.">
           <ImportPanel />
+        </Section>
+        <Section id="tags" title="Highlight tags" description="Create the tags you need, for example Viva, Formula or Lab. Each tag has a name, an icon and a colour.">
+          <TagEditor />
         </Section>
         <Section id="samples" title="Sample study material" description="Example subjects, highlighted notes, flashcards, quiz results and community posts.">
           <SampleData />

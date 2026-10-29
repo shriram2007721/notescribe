@@ -99,23 +99,9 @@
   font-size: 0.85em;
   margin-right: 0.25em;
 }
-.smart-hl[data-tag="exam"] {
-  background: hsl(var(--hl-exam) / 0.55);
-}
-.smart-hl[data-tag="exam"]::before {
-  content: "📚";
-}
-.smart-hl[data-tag="interview"] {
-  background: hsl(var(--hl-interview) / 0.5);
-}
-.smart-hl[data-tag="interview"]::before {
-  content: "💼";
-}
-.smart-hl[data-tag="concept"] {
-  background: hsl(var(--hl-concept) / 0.45);
-}
-.smart-hl[data-tag="concept"]::before {
-  content: "💡";
+/* Colour and icon come from the element (see smart-highlight.ts), so any tag works. */
+.smart-hl::before {
+  content: attr(data-icon);
 }
 
 /* ---------- Focus (distraction-free) mode ---------- */

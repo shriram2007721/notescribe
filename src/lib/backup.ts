@@ -12,7 +12,7 @@ export const BACKUP_FORMAT = "notescribe-backup";
 export const BACKUP_VERSION = 1;
 export const MAX_BACKUP_BYTES = 25 * 1024 * 1024;
 
-const tag = z.enum(["exam", "interview", "concept"]);
+const tag = z.string().min(1).max(40);
 const flag = z.union([z.literal(0), z.literal(1)]).default(0);
 const time = z.number().finite().nonnegative();
 const doc = z

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { TagChips } from "@/components/tag-chips";
 import type { HighlightTag } from "@/lib/db";
-import { HIGHLIGHTS, HIGHLIGHT_ORDER, HIGHLIGHT_STYLES } from "@/lib/highlights";
+import { tagFill, tagInfo, tagOrder } from "@/lib/highlights";
 import { community, ensureCommunitySeeded } from "@/lib/share";
 import { cn } from "@/lib/utils";
 
@@ -38,17 +38,15 @@ export default function CommunityPage() {
         >
           All
         </button>
-        {HIGHLIGHT_ORDER.map((t) => (
+        {tagOrder().map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setTag(tag === t ? null : t)}
-            className={cn(
-              "rounded-full border px-3 py-1.5 text-xs font-medium",
-              tag === t ? cn(HIGHLIGHT_STYLES[t].chip, "border-transparent") : "hover:bg-accent",
-            )}
+            style={tag === t ? { backgroundColor: tagFill(t, 0.45) } : undefined}
+            className={cn("rounded-full border px-3 py-1.5 text-xs font-medium", tag === t ? "border-transparent" : "hover:bg-accent")}
           >
-            {HIGHLIGHTS[t].icon} {HIGHLIGHTS[t].label}
+            {tagInfo(t).icon} {tagInfo(t).label}
           </button>
         ))}
       </div>

@@ -1,6 +1,7 @@
 import Dexie, { type EntityTable } from "dexie";
 
-export type HighlightTag = "exam" | "interview" | "concept";
+/** A tag id: one of the defaults (exam, interview, concept) or a user-created id. See highlights.ts. */
+export type HighlightTag = string;
 
 /** 0/1 instead of boolean because IndexedDB cannot index booleans. */
 export type Flag = 0 | 1;

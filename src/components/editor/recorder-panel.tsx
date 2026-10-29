@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { useOnline } from "@/hooks/use-online";
 import { MAX_RECORDING_MS, useWhisper, voiceSupport } from "@/hooks/use-whisper";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +34,7 @@ export function RecorderPanel({ editor, onClose }: { editor: Editor; onClose: ()
   }, [v.status, editor]);
 
   const busy = v.status === "recording" || v.status === "paused" || v.status === "transcribing";
+  const online = useOnline();
 
   const insert = (mode: "cursor" | "replace") => {
     const nodes = toParagraphs(v.transcript);
@@ -107,6 +109,11 @@ export function RecorderPanel({ editor, onClose }: { editor: Editor; onClose: ()
             {v.status === "recording" && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-primary align-middle" />}
           </p>
         </div>
+      )}
+      {!online && !v.modelReady && !unsupported && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          You&apos;re offline. Voice needs the speech model, which is downloaded once while online. Download it in Settings → Offline voice transcription.
+        </p>
       )}
       {(unsupported || v.error) && (
         <p role="alert" className="mt-2 text-sm text-destructive">

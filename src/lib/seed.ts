@@ -1,5 +1,4 @@
 import type { CommunityPost, HighlightTag } from "@/lib/db";
-import { HIGHLIGHT_ORDER } from "@/lib/highlights";
 
 type Part = string | [HighlightTag, string];
 
@@ -24,7 +23,7 @@ function post(id: string, title: string, author: string, daysAgo: number, likes:
     author,
     content,
     plainText: paragraphs.map((ps) => ps.map((p) => (typeof p === "string" ? p : p[1])).join("")).join("\n"),
-    tags: HIGHLIGHT_ORDER.filter((t) => used.has(t)),
+    tags: Array.from(used),
     // Fixed epoch offset so the seed is deterministic.
     publishedAt: Date.UTC(2026, 9, 25) - daysAgo * DAY,
     likes,

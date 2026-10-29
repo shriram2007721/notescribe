@@ -4,7 +4,7 @@ import type { Editor } from "@tiptap/react";
 import { Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { HighlightTag } from "@/lib/db";
-import { extractHighlights, HIGHLIGHTS, HIGHLIGHT_ORDER, HIGHLIGHT_STYLES, type ExtractedHighlight } from "@/lib/highlights";
+import { extractHighlights, tagBorder, tagFill, tagInfo, tagOrder, type ExtractedHighlight } from "@/lib/highlights";
 import { cn } from "@/lib/utils";
 
 type Filter = "all" | HighlightTag;
@@ -32,7 +32,7 @@ export function HighlightExtractor({ editor, className }: { editor: Editor; clas
   };
 
   const copyList = async () => {
-    const text = visible.map((h) => `- ${HIGHLIGHTS[h.tag].icon} ${h.text}`).join("\n");
+    const text = visible.map((h) => `- ${tagInfo(h.tag).icon} ${h.text}`).join("\n");
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -61,9 +61,9 @@ export function HighlightExtractor({ editor, className }: { editor: Editor; clas
         <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>
           All <span className="opacity-60">{items.length}</span>
         </FilterChip>
-        {HIGHLIGHT_ORDER.map((t) => (
-          <FilterChip key={t} active={filter === t} onClick={() => setFilter(t)} activeClass={HIGHLIGHT_STYLES[t].chip}>
-            {HIGHLIGHTS[t].icon} {HIGHLIGHTS[t].short} <span className="opacity-60">{count(t)}</span>
+        {tagOrder().map((t) => (
+          <FilterChip key={t} active={filter === t} onClick={() => setFilter(t)} activeFill={tagFill(t, 0.45)}>
+            {tagInfo(t).icon} {tagInfo(t).short} <span className="opacity-60">{count(t)}</span>
           </FilterChip>
         ))}
       </div>
@@ -72,7 +72,7 @@ export function HighlightExtractor({ editor, className }: { editor: Editor; clas
         <p className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
           {items.length === 0
             ? "Select text and pick 📚 💼 or 💡 to start building your revision list."
-            : `No ${filter !== "all" ? HIGHLIGHTS[filter].label : ""} points yet.`}
+            : `No ${filter !== "all" ? tagInfo(filter).label : ""} points yet.`}
         </p>
       ) : (
         <ol className="space-y-2">
@@ -83,11 +83,11 @@ export function HighlightExtractor({ editor, className }: { editor: Editor; clas
                 onClick={() => jumpTo(h)}
                 className={cn(
                   "w-full rounded-md border border-l-4 bg-card p-2.5 text-left text-sm leading-snug hover:bg-accent",
-                  HIGHLIGHT_STYLES[h.tag].border,
                 )}
+                style={{ borderLeftColor: tagBorder(h.tag) }}
               >
-                <span className="mr-1" aria-label={HIGHLIGHTS[h.tag].label}>
-                  {HIGHLIGHTS[h.tag].icon}
+                <span className="mr-1" aria-label={tagInfo(h.tag).label}>
+                  {tagInfo(h.tag).icon}
                 </span>
                 {h.text}
               </button>
@@ -102,12 +102,13 @@ export function HighlightExtractor({ editor, className }: { editor: Editor; clas
 function FilterChip({
   active,
   onClick,
-  activeClass = "bg-foreground text-background",
+  activeFill,
   children,
 }: {
   active: boolean;
   onClick: () => void;
-  activeClass?: string;
+  /** Background colour when active; defaults to the foreground colour. */
+  activeFill?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -116,9 +117,10 @@ function FilterChip({
       role="tab"
       aria-selected={active}
       onClick={onClick}
+      style={active && activeFill ? { backgroundColor: activeFill } : undefined}
       className={cn(
         "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-        active ? cn(activeClass, "border-transparent") : "hover:bg-accent",
+        active ? (activeFill ? "border-transparent" : "border-transparent bg-foreground text-background") : "hover:bg-accent",
       )}
     >
       {children}

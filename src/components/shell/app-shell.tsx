@@ -23,6 +23,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { useFolders } from "@/hooks/use-data";
 import { useOnline } from "@/hooks/use-online";
+import { loadTags } from "@/lib/highlights";
 import { loadSampleData } from "@/lib/sample-data";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -43,6 +44,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const online = useOnline();
   const pathname = usePathname();
+  // Saved highlight tags are read after mount, so the page content renders only then (avoids a hydration mismatch).
+  const [tagsReady, setTagsReady] = useState(false);
+
+  useEffect(() => {
+    loadTags();
+    setTagsReady(true);
+  }, []);
 
   // Close the mobile drawer on navigation.
   useEffect(() => setDrawerOpen(false), [pathname]);
@@ -134,7 +142,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         )}
         <StorageGuard />
-        <main id="main">{children}</main>
+        <main id="main">{tagsReady ? children : null}</main>
       </div>
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
@@ -200,8 +208,13 @@ function SidebarContent({ onSearch }: { onSearch: () => void }) {
 
         <div className="mt-6 flex items-center justify-between px-3">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Subjects</h2>
-          <button type="button" onClick={() => setFolderDialog(true)} className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="New subject">
-            <FolderPlus className="h-4 w-4" />
+          <button
+            type="button"
+            onClick={() => setFolderDialog(true)}
+            className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-xs font-medium text-primary hover:bg-accent"
+            aria-label="New subject"
+          >
+            <FolderPlus className="h-4 w-4" /> New
           </button>
         </div>
         <ul className="mt-1 space-y-0.5">

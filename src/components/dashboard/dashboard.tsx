@@ -11,7 +11,7 @@ import { Select } from "@/components/ui/input";
 import { useAllNotes, useCards, useFolders, useQuizAttempts, useReviews } from "@/hooks/use-data";
 import type { HighlightTag } from "@/lib/db";
 import { deleteFolder } from "@/lib/folders";
-import { HIGHLIGHTS, HIGHLIGHT_ORDER, HIGHLIGHT_STYLES } from "@/lib/highlights";
+import { tagFill, tagInfo, tagOrder } from "@/lib/highlights";
 import { createNote, emptyTrash, filterNotes, type NoteSort } from "@/lib/notes";
 import { loadSampleData } from "@/lib/sample-data";
 import { computeStats } from "@/lib/stats";
@@ -257,9 +257,9 @@ export function Dashboard() {
                 )}
               </div>
               <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 lg:pb-0">
-                {HIGHLIGHT_ORDER.map((t) => (
-                  <Chip key={t} active={tag === t} activeClass={HIGHLIGHT_STYLES[t].chip} onClick={() => setTag(tag === t ? null : t)}>
-                    {HIGHLIGHTS[t].icon} {HIGHLIGHTS[t].short}
+                {tagOrder().map((t) => (
+                  <Chip key={t} active={tag === t} activeFill={tagFill(t, 0.45)} onClick={() => setTag(tag === t ? null : t)}>
+                    {tagInfo(t).icon} {tagInfo(t).short}
                   </Chip>
                 ))}
                 {!trash && (
@@ -307,15 +307,16 @@ export function Dashboard() {
   );
 }
 
-function Chip({ active, onClick, activeClass, children }: { active: boolean; onClick: () => void; activeClass?: string; children: React.ReactNode }) {
+function Chip({ active, onClick, activeFill, children }: { active: boolean; onClick: () => void; activeFill?: string; children: React.ReactNode }) {
   return (
     <button
       type="button"
       aria-pressed={active}
       onClick={onClick}
+      style={active && activeFill ? { backgroundColor: activeFill } : undefined}
       className={cn(
         "inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-        active ? cn("border-transparent", activeClass ?? "bg-foreground text-background") : "hover:bg-accent",
+        active ? (activeFill ? "border-transparent" : "border-transparent bg-foreground text-background") : "hover:bg-accent",
       )}
     >
       {children}

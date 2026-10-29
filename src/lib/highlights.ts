@@ -1,20 +1,71 @@
 import type { Node as PMNode } from "@tiptap/pm/model";
 import type { HighlightTag } from "@/lib/db";
 
-export const HIGHLIGHTS: Record<HighlightTag, { label: string; short: string; icon: string; shortcut: string }> = {
-  exam: { label: "Exam Important", short: "Exam", icon: "📚", shortcut: "Mod-Alt-1" },
-  interview: { label: "Interview Important", short: "Interview", icon: "💼", shortcut: "Mod-Alt-2" },
-  concept: { label: "Key Concept", short: "Concept", icon: "💡", shortcut: "Mod-Alt-3" },
-};
+/* ------------------------------------------------------------------ */
+/* Tag registry: the default tags plus any the user adds. Stored in   */
+/* this browser (localStorage) so highlights keep their look.         */
+/* ------------------------------------------------------------------ */
 
-export const HIGHLIGHT_ORDER: HighlightTag[] = ["exam", "interview", "concept"];
+export interface TagDef {
+  id: HighlightTag;
+  label: string;
+  short: string;
+  icon: string;
+  /** Hue (0–360) used for the highlight colour. */
+  hue: number;
+}
 
-/** Tailwind classes per tag; kept as literals so Tailwind can see them. */
-export const HIGHLIGHT_STYLES: Record<HighlightTag, { chip: string; border: string }> = {
-  exam: { chip: "bg-exam/40", border: "border-l-exam" },
-  interview: { chip: "bg-interview/40", border: "border-l-interview" },
-  concept: { chip: "bg-concept/40", border: "border-l-concept" },
-};
+export const TAG_HUES = [45, 150, 215, 0, 280, 25, 330, 180];
+
+export const DEFAULT_TAGS: TagDef[] = [
+  { id: "exam", label: "Exam Important", short: "Exam", icon: "📚", hue: 45 },
+  { id: "interview", label: "Interview Important", short: "Interview", icon: "💼", hue: 150 },
+  { id: "concept", label: "Key Concept", short: "Concept", icon: "💡", hue: 215 },
+];
+
+const KEY = "notescribe.tags";
+
+function load(): TagDef[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(KEY) ?? "null") as TagDef[] | null;
+    if (Array.isArray(parsed) && parsed.length && parsed.every((t) => t.id && t.label)) return parsed;
+  } catch {
+    /* unreadable storage: fall back to the defaults */
+  }
+  return DEFAULT_TAGS;
+}
+
+// Starts with the defaults so server and first client render match; loadTags() runs after mount.
+let registry: TagDef[] = DEFAULT_TAGS;
+
+/** Reads the saved tags from this browser. Call once after the first render. */
+export function loadTags() {
+  registry = load();
+}
+
+/** Tags in the order they are shown. */
+export const getTags = () => registry;
+export const tagOrder = (): HighlightTag[] => registry.map((t) => t.id);
+
+/** Info for any tag id, including ones that were removed from the registry. */
+export function tagInfo(id: HighlightTag): TagDef {
+  return registry.find((t) => t.id === id) ?? { id, label: id, short: id, icon: "🏷️", hue: 0 };
+}
+
+/** Saves the tag list. The caller should reload so editors pick up the new tags. */
+export function saveTags(tags: TagDef[]) {
+  registry = tags;
+  localStorage.setItem(KEY, JSON.stringify(tags));
+}
+
+export function resetTags() {
+  localStorage.removeItem(KEY);
+  registry = DEFAULT_TAGS;
+}
+
+/** Highlight background and chip colours for a tag. */
+export const tagFill = (id: HighlightTag, alpha = 0.5) => `hsl(${tagInfo(id).hue} 85% 70% / ${alpha})`;
+export const tagBorder = (id: HighlightTag) => `hsl(${tagInfo(id).hue} 65% 45%)`;
 
 export interface ExtractedHighlight {
   tag: HighlightTag;
@@ -116,6 +167,9 @@ function sentenceAround(text: string, start: number, end: number) {
   return text.slice(sStart === -1 ? 0 : sStart + 2, sEnd).trim();
 }
 
+/** Tags that appear in the given highlights, in the registry's order (unknown tags last). */
 export function tagsIn(highlights: ExtractedHighlight[]): HighlightTag[] {
-  return HIGHLIGHT_ORDER.filter((t) => highlights.some((h) => h.tag === t));
+  const found = new Set(highlights.map((h) => h.tag));
+  const known = tagOrder().filter((t) => found.has(t));
+  return [...known, ...Array.from(found).filter((t) => !known.includes(t))];
 }
