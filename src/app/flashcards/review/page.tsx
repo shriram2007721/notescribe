@@ -24,6 +24,7 @@ export default function ReviewPage() {
   const [folder, setFolder] = useState("");
   const [queue, setQueue] = useState<Flashcard[] | null>(null);
   const [ahead, setAhead] = useState(false);
+  const [shuffle, setShuffle] = useState(false);
 
   const available = useMemo(() => {
     const scoped = (cards ?? []).filter((c) => !folder || c.folderId === folder);
@@ -58,9 +59,15 @@ export default function ReviewPage() {
             </Select>
           </label>
           {available.length > 0 ? (
-            <Button className="w-full" onClick={() => setQueue(available)}>
-              Start review ({available.length})
-            </Button>
+            <>
+              <label className="flex items-center justify-between gap-3 text-sm">
+                Shuffle cards
+                <input type="checkbox" checked={shuffle} onChange={(e) => setShuffle(e.target.checked)} className="h-4 w-4" />
+              </label>
+              <Button className="w-full" onClick={() => setQueue(shuffle ? shuffled(available) : available)}>
+                Start review ({available.length})
+              </Button>
+            </>
           ) : (
             <div className="space-y-3 text-sm">
               <p className="flex items-center gap-2 text-muted-foreground">
@@ -81,6 +88,16 @@ export default function ReviewPage() {
       )}
     </div>
   );
+}
+
+/** Fisher–Yates shuffle on a copy, so the original order is kept. */
+function shuffled<T>(items: T[]): T[] {
+  const a = [...items];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
 
 function Session({ initial, onExit }: { initial: Flashcard[]; onExit: () => void }) {

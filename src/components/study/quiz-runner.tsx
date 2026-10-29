@@ -19,7 +19,7 @@ const expectedText = (q: Question) =>
 
 /** Runs a quiz one question at a time and saves the attempt (real results only) when finished. */
 export function QuizRunner({
-  questions,
+  questions: initialQuestions,
   title,
   source,
   noteIds = [],
@@ -31,8 +31,10 @@ export function QuizRunner({
   noteIds?: string[];
   onExit?: () => void;
 }) {
+  // The current round: all questions, or only the ones missed in the last round.
+  const [questions, setQuestions] = useState(initialQuestions);
   const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState<(Answer | null)[]>(() => questions.map(() => null));
+  const [answers, setAnswers] = useState<(Answer | null)[]>(() => initialQuestions.map(() => null));
   const [shortDraft, setShortDraft] = useState("");
   const [shortRevealed, setShortRevealed] = useState(false);
   const [finished, setFinished] = useState(false);
@@ -43,6 +45,18 @@ export function QuizRunner({
   const answer = answers[index];
 
   const record = (a: Answer) => setAnswers((prev) => prev.map((x, i) => (i === index ? a : x)));
+
+  /** Starts a new round over the given questions; each round is saved as its own attempt. */
+  const startRound = (qs: Question[]) => {
+    setQuestions(qs);
+    setAnswers(qs.map(() => null));
+    setIndex(0);
+    setShortDraft("");
+    setShortRevealed(false);
+    setFinished(false);
+    saved.current = false;
+    startedAt.current = Date.now();
+  };
 
   const next = () => {
     setShortDraft("");
@@ -127,16 +141,13 @@ export function QuizRunner({
           </div>
         )}
         <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => {
-              setAnswers(questions.map(() => null));
-              setIndex(0);
-              setFinished(false);
-              saved.current = false;
-              startedAt.current = Date.now();
-            }}
-          >
-            <RotateCcw className="h-4 w-4" /> Retry
+          {wrong.length > 0 && (
+            <Button onClick={() => startRound(wrong.map((x) => x.q))}>
+              <RotateCcw className="h-4 w-4" /> Retry wrong answers ({wrong.length})
+            </Button>
+          )}
+          <Button variant={wrong.length > 0 ? "outline" : "default"} onClick={() => startRound(initialQuestions)}>
+            <RotateCcw className="h-4 w-4" /> Retry all
           </Button>
           {onExit && (
             <Button variant="outline" onClick={onExit}>
