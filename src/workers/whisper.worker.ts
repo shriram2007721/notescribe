@@ -17,11 +17,16 @@ async function loadLibrary(): Promise<typeof Transformers> {
   return lib;
 }
 
-export type WorkerRequest = { type: "load" } | { type: "transcribe"; audio: Float32Array };
+export type WorkerRequest =
+  | { type: "load" }
+  | { type: "transcribe"; audio: Float32Array }
+  // Live preview while recording: a window of at most 30 s; `commit` marks a finished segment.
+  | { type: "partial"; audio: Float32Array; commit: boolean };
 export type WorkerResponse =
   | { type: "progress"; progress: number }
   | { type: "ready" }
   | { type: "result"; text: string }
+  | { type: "partial"; text: string; commit: boolean }
   | { type: "error"; message: string };
 
 const post = (msg: WorkerResponse) => self.postMessage(msg);
@@ -60,22 +65,34 @@ function describe(err: unknown) {
   return msg;
 }
 
-self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
+const clean = (out: { text: string } | { text: string }[]) =>
+  (Array.isArray(out) ? out.map((o) => o.text).join(" ") : out.text)
+    .replace(/\[(BLANK_AUDIO|MUSIC|NOISE)\]|\((?:[^)]*)\)/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+async function handle(req: WorkerRequest) {
   try {
-    if (e.data.type === "load") {
+    if (req.type === "load") {
       await load();
       post({ type: "ready" });
       return;
     }
     const transcriber = await load();
     post({ type: "ready" });
-    const out = await transcriber(e.data.audio, { chunk_length_s: 30, stride_length_s: 5 });
-    const text = (Array.isArray(out) ? out.map((o) => o.text).join(" ") : out.text)
-      .replace(/\[(BLANK_AUDIO|MUSIC|NOISE)\]|\((?:[^)]*)\)/gi, "")
-      .replace(/\s+/g, " ")
-      .trim();
-    post({ type: "result", text });
+    if (req.type === "partial") {
+      post({ type: "partial", text: clean(await transcriber(req.audio)), commit: req.commit });
+      return;
+    }
+    post({ type: "result", text: clean(await transcriber(req.audio, { chunk_length_s: 30, stride_length_s: 5 })) });
   } catch (err) {
     post({ type: "error", message: describe(err) });
   }
+}
+
+// One request at a time: the pipeline isn't safe to call concurrently, and the final
+// transcription must wait for any live-preview pass that is still running.
+let queue = Promise.resolve();
+self.onmessage = (e: MessageEvent<WorkerRequest>) => {
+  queue = queue.then(() => handle(e.data));
 };

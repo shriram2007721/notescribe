@@ -97,6 +97,17 @@ export function RecorderPanel({ editor, onClose }: { editor: Editor; onClose: ()
       {(v.status === "recording" || v.status === "paused") && v.modelProgress !== null && (
         <p className="mt-2 text-xs text-muted-foreground">Preparing speech model in the background: {v.modelProgress}%</p>
       )}
+      {busy && (v.liveText || v.modelReady) && (
+        <div className="mt-3 rounded-md border bg-muted/40 p-3">
+          <p className="mb-1 text-xs font-medium text-muted-foreground">
+            Live transcript {v.status === "transcribing" ? "· finalising…" : "· preview, refreshes every few seconds"}
+          </p>
+          <p aria-live="polite" className="max-h-40 overflow-y-auto whitespace-pre-wrap text-sm">
+            {v.liveText || <span className="text-muted-foreground">Listening… start speaking.</span>}
+            {v.status === "recording" && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-primary align-middle" />}
+          </p>
+        </div>
+      )}
       {(unsupported || v.error) && (
         <p role="alert" className="mt-2 text-sm text-destructive">
           {unsupported ?? v.error}

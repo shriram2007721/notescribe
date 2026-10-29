@@ -7,6 +7,8 @@ export type VoiceStatus = "idle" | "recording" | "paused" | "transcribing" | "re
 
 const SAMPLE_RATE = 16_000; // what Whisper expects
 export const MAX_RECORDING_MS = 30 * 60_000; // keeps memory and transcription time reasonable
+const LIVE_INTERVAL_MS = 2_000; // how often the live preview refreshes
+const SEGMENT_SAMPLES = 25 * SAMPLE_RATE; // live audio is committed in 25 s pieces (Whisper's window is 30 s)
 
 export function voiceSupport(): string | null {
   if (typeof window === "undefined") return null;
@@ -37,8 +39,12 @@ export function useWhisper() {
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [transcript, setTranscript] = useState("");
+  const [liveText, setLiveText] = useState("");
 
   const workerRef = useRef<Worker | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  // Live preview state: text already committed, how many samples it covers, and whether a pass is running.
+  const live = useRef({ active: false, busy: false, ready: false, text: "", samples: 0, timer: 0 as ReturnType<typeof setInterval> | 0 });
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const discardRef = useRef(false);
@@ -54,6 +60,12 @@ export function useWhisper() {
     clock.current.timer = 0;
   }
 
+  function stopLive() {
+    if (live.current.timer) clearInterval(live.current.timer);
+    live.current.timer = 0;
+    live.current.active = false;
+  }
+
   const getWorker = useCallback(() => {
     if (workerRef.current) return workerRef.current;
     const worker = new Worker(new URL("../workers/whisper.worker.ts", import.meta.url), { type: "module" });
@@ -61,8 +73,18 @@ export function useWhisper() {
       const msg = e.data;
       if (msg.type === "progress") setModelProgress(msg.progress);
       else if (msg.type === "ready") {
+        live.current.ready = true;
         setModelReady(true);
         setModelProgress(null);
+      } else if (msg.type === "partial") {
+        const l = live.current;
+        l.busy = false;
+        if (!l.active) return;
+        if (msg.commit) {
+          l.text = [l.text, msg.text].filter(Boolean).join(" ");
+          l.samples += SEGMENT_SAMPLES;
+          setLiveText(l.text);
+        } else setLiveText([l.text, msg.text].filter(Boolean).join(" "));
       } else if (msg.type === "result") {
         setTranscript(msg.text);
         setStatus(msg.text ? "review" : "error");
@@ -82,6 +104,7 @@ export function useWhisper() {
       // Always release the microphone and worker when the component goes away.
       discardRef.current = true;
       tickStop();
+      stopLive();
       if (recorderRef.current?.state !== "inactive") recorderRef.current?.stop();
       stopTracks();
       workerRef.current?.terminate();
@@ -126,9 +149,11 @@ export function useWhisper() {
 
     const recorder = new MediaRecorder(streamRef.current);
     const chunks: Blob[] = [];
+    chunksRef.current = chunks;
     recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
     recorder.onstop = async () => {
       pauseClock();
+      stopLive();
       stopTracks();
       if (discardRef.current) {
         setStatus("idle");
@@ -152,6 +177,29 @@ export function useWhisper() {
     setStatus("recording");
     // Load the model while the user is speaking so it's ready when they stop.
     getWorker().postMessage({ type: "load" });
+
+    // Live preview: every few seconds transcribe the audio since the last committed segment.
+    stopLive();
+    live.current = { ...live.current, active: true, busy: false, text: "", samples: 0 };
+    setLiveText("");
+    live.current.timer = setInterval(async () => {
+      const l = live.current;
+      if (!l.active || l.busy || !l.ready || recorder.state !== "recording" || !chunks.length) return;
+      l.busy = true;
+      try {
+        const audio = await decodeToMono16k(new Blob(chunks, { type: recorder.mimeType }));
+        const pending = audio.length - l.samples;
+        if (!l.active || pending < SAMPLE_RATE) {
+          l.busy = false;
+          return;
+        }
+        const commit = pending > SEGMENT_SAMPLES;
+        const window = audio.slice(l.samples, commit ? l.samples + SEGMENT_SAMPLES : audio.length);
+        getWorker().postMessage({ type: "partial", audio: window, commit }, [window.buffer]);
+      } catch {
+        l.busy = false; // a partly written chunk can fail to decode; the next tick retries
+      }
+    }, LIVE_INTERVAL_MS);
   }, [getWorker, pauseClock, startClock]);
 
   const stop = useCallback(() => {
@@ -182,7 +230,9 @@ export function useWhisper() {
     if (r && r.state !== "inactive") r.stop();
     else setStatus("idle");
     stopTracks();
+    stopLive();
     setTranscript("");
+    setLiveText("");
     setError(null);
     setElapsed(0);
   }, []);
@@ -190,6 +240,7 @@ export function useWhisper() {
   const reset = useCallback(() => {
     setStatus("idle");
     setTranscript("");
+    setLiveText("");
     setError(null);
     setElapsed(0);
   }, []);
@@ -200,7 +251,7 @@ export function useWhisper() {
     getWorker().postMessage({ type: "load" });
   }, [getWorker]);
 
-  return { status, modelProgress, modelReady, error, elapsed, transcript, setTranscript, start, stop, pause, resume, discard, reset, preload };
+  return { status, modelProgress, modelReady, error, elapsed, transcript, liveText, setTranscript, start, stop, pause, resume, discard, reset, preload };
 }
 
 function currentElapsed(c: { accumulated: number; startedAt: number }) {
